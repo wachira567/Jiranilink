@@ -4,10 +4,11 @@ import { toast } from "react-toastify";
 import ItemCard from "../components/ItemCard";
 import SearchBar from "../components/SearchBar";
 import BorrowRequestModal from "../components/BorrowRequestModal";
-import mockData from "../data/mockData.json";
+import { subscribeToItems } from "../services/itemService";
+import { createBorrowRequest } from "../services/borrowService";
 
 const Catalog = () => {
-  const { userId, isLoaded } = useAuth();
+  const { userId, user, isLoaded } = useAuth();
   const [items, setItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -15,120 +16,151 @@ const Catalog = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
   const itemsPerPage = 6;
 
+  // Load all items with real-time updates
   useEffect(() => {
-    // Simulate loading data
-    setItems(mockData.items);
-    setFilteredItems(mockData.items);
+    const unsubscribe = subscribeToItems((fetchedItems) => {
+      setItems(fetchedItems);
+      setFilteredItems(fetchedItems);
+      setIsLoading(false);
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     let filtered = items.filter(
       (item) =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchTerm.toLowerCase())
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        (selectedCategory === "All" || item.category === selectedCategory)
     );
-
-    if (selectedCategory !== "All") {
-      filtered = filtered.filter((item) => item.category === selectedCategory);
-    }
-
     setFilteredItems(filtered);
-    setCurrentPage(1); // Reset to first page when filtering
+    setCurrentPage(1);
   }, [searchTerm, selectedCategory, items]);
 
   const handleBorrowClick = (item) => {
+    if (!userId) {
+      toast.error("Please sign in to borrow items");
+      return;
+    }
     setSelectedItem(item);
     setShowModal(true);
   };
 
-  const handleBorrowSubmit = (requestData) => {
-    // In a real app, this would send to backend with userId
-    const requestWithUser = {
-      ...requestData,
-      borrowerId: userId, // Assign the Clerk user ID
-      borrowerName: requestData.borrowerName,
-      timestamp: new Date().toISOString(),
-    };
-    toast.success(
-      "Borrow request sent successfully! The owner will respond soon."
-    );
-    setShowModal(false);
+  const handleBorrowSubmit = async (requestData) => {
+    if (!userId) {
+      toast.error("Please sign in to borrow items");
+      return;
+    }
+
+    try {
+      const borrowRequest = {
+        itemId: selectedItem.id,
+        itemName: selectedItem.name,
+        ownerId: selectedItem.ownerId,
+        ownerName: selectedItem.ownerName,
+        borrowerId: userId,
+        borrowerName: user?.fullName || user?.firstName || "User",
+        startDate: requestData.startDate,
+        endDate: requestData.endDate,
+      };
+
+      await createBorrowRequest(borrowRequest);
+      toast.success(
+        "Borrow request sent successfully! The owner will respond soon."
+      );
+      setShowModal(false);
+    } catch (error) {
+      console.error("Error creating borrow request:", error);
+      toast.error("Failed to send borrow request. Please try again.");
+    }
   };
 
-  const getOwner = (ownerId) => {
-    return mockData.users.find((user) => user.id === ownerId);
+  const getOwner = (item) => {
+    return {
+      name: item.ownerName || "Owner",
+      id: item.ownerId,
+    };
   };
 
   // Pagination logic
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentItems = filteredItems.slice(startIndex, endIndex);
+  const currentItems = filteredItems.slice(
+    startIndex,
+    startIndex + itemsPerPage
+  );
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
   };
 
-  if (!isLoaded) return <div>Loading...</div>;
+  if (!isLoaded || isLoading) return <div className="loading">Loading...</div>;
 
   return (
     <div className="catalog-page page-content">
       <div className="page-header">
-        <h1>Community Items</h1>
-        <p>Borrow what you need from your trusted neighbors</p>
+        <h1>Item Catalog</h1>
+        <p>Browse and borrow items from your community</p>
       </div>
 
       <SearchBar
-        onSearch={setSearchTerm}
-        onCategoryChange={setSelectedCategory}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
       />
 
-      <div className="items-grid">
-        {currentItems.map((item) => (
-          <ItemCard
-            key={item.id}
-            item={item}
-            owner={getOwner(item.ownerId)}
-            onBorrow={handleBorrowClick}
-          />
-        ))}
-      </div>
-
-      {filteredItems.length === 0 && (
+      {filteredItems.length === 0 ? (
         <div className="empty-state">
           <p>No items found matching your search.</p>
+          <p>Try adjusting your filters or check back later!</p>
         </div>
-      )}
+      ) : (
+        <>
+          <div className="items-grid">
+            {currentItems.map((item) => (
+              <ItemCard
+                key={item.id}
+                item={item}
+                owner={getOwner(item)}
+                onBorrow={handleBorrowClick}
+                isOwnItem={item.ownerId === userId}
+              />
+            ))}
+          </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="pagination">
-          <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="btn-secondary"
-          >
-            Previous
-          </button>
-          <span>
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="btn-secondary"
-          >
-            Next
-          </button>
-        </div>
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button
+                className="btn-secondary"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </button>
+              <span>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                className="btn-secondary"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {showModal && selectedItem && (
         <BorrowRequestModal
           item={selectedItem}
-          owner={getOwner(selectedItem.ownerId)}
+          owner={getOwner(selectedItem)}
           onClose={() => setShowModal(false)}
           onSubmit={handleBorrowSubmit}
         />

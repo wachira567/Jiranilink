@@ -11,6 +11,7 @@ import Messages from "./pages/Messages";
 import ChatWindow from "./components/ChatWindow";
 import SignInPage from "./pages/SignIn";
 import SignUpPage from "./pages/SignUp";
+import AdminDashboard from "./pages/AdminDashboard";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -74,6 +75,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
                 </ProtectedRoute>
               }
             />

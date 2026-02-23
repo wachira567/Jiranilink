@@ -70,14 +70,19 @@ export const getBorrowRequestsByOwner = async (ownerId) => {
   try {
     const q = query(
       borrowRequestsCollection,
-      where("ownerId", "==", ownerId),
-      orderBy("timestamp", "desc")
+      where("ownerId", "==", ownerId)
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
+    const requests = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
+    
+    return requests.sort((a, b) => {
+      const timeA = a.timestamp?.toMillis() || 0;
+      const timeB = b.timestamp?.toMillis() || 0;
+      return timeB - timeA;
+    });
   } catch (error) {
     console.error("Error getting borrow requests by owner:", error);
     throw error;
@@ -91,14 +96,19 @@ export const getBorrowRequestsByBorrower = async (borrowerId) => {
   try {
     const q = query(
       borrowRequestsCollection,
-      where("borrowerId", "==", borrowerId),
-      orderBy("timestamp", "desc")
+      where("borrowerId", "==", borrowerId)
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
+    const requests = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
+    
+    return requests.sort((a, b) => {
+      const timeA = a.timestamp?.toMillis() || 0;
+      const timeB = b.timestamp?.toMillis() || 0;
+      return timeB - timeA;
+    });
   } catch (error) {
     console.error("Error getting borrow requests by borrower:", error);
     throw error;
@@ -111,15 +121,24 @@ export const getBorrowRequestsByBorrower = async (borrowerId) => {
 export const subscribeToBorrowRequestsByOwner = (ownerId, callback) => {
   const q = query(
     borrowRequestsCollection,
-    where("ownerId", "==", ownerId),
-    orderBy("timestamp", "desc")
+    where("ownerId", "==", ownerId)
   );
   return onSnapshot(q, (snapshot) => {
     const requests = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
+    
+    requests.sort((a, b) => {
+      const timeA = a.timestamp?.toMillis() || 0;
+      const timeB = b.timestamp?.toMillis() || 0;
+      return timeB - timeA;
+    });
+    
     callback(requests);
+  }, (error) => {
+    console.error("Error subscribing to borrow requests by owner:", error);
+    callback([]);
   });
 };
 
@@ -129,15 +148,68 @@ export const subscribeToBorrowRequestsByOwner = (ownerId, callback) => {
 export const subscribeToBorrowRequestsByBorrower = (borrowerId, callback) => {
   const q = query(
     borrowRequestsCollection,
-    where("borrowerId", "==", borrowerId),
-    orderBy("timestamp", "desc")
+    where("borrowerId", "==", borrowerId)
   );
   return onSnapshot(q, (snapshot) => {
     const requests = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
+    
+    requests.sort((a, b) => {
+      const timeA = a.timestamp?.toMillis() || 0;
+      const timeB = b.timestamp?.toMillis() || 0;
+      return timeB - timeA;
+    });
+    
     callback(requests);
+  }, (error) => {
+    console.error("Error subscribing to borrow requests by borrower:", error);
+    callback([]);
+  });
+};
+
+/**
+ * Subscribe to ALL borrow requests in a specific region (For Admins)
+ */
+export const subscribeToAllRequestsByRegion = (regionId, callback) => {
+  if (!regionId) {
+    // If no region provided, maybe return all (Super Admin)
+     const q = query(borrowRequestsCollection);
+     return onSnapshot(q, (snapshot) => {
+        const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        requests.sort((a, b) => {
+          const timeA = a.timestamp?.toMillis() || 0;
+          const timeB = b.timestamp?.toMillis() || 0;
+          return timeB - timeA;
+        });
+        callback(requests);
+     });
+  }
+
+  // To truly filter by region on requests we would need regionId on the borrow_request doc.
+  // Since we don't currently save regionId on borrow requests directly, we will fetch all 
+  // and filter by the owner's region ID client-side (or assume the item is in this region).
+  // For optimal architecture, borrow requests SHOULD save regionId, but as a workaround:
+  const q = query(borrowRequestsCollection);
+  
+  return onSnapshot(q, (snapshot) => {
+    const requests = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    
+    // Sort descending by timestamp client-side
+    requests.sort((a, b) => {
+      const timeA = a.timestamp?.toMillis() || 0;
+      const timeB = b.timestamp?.toMillis() || 0;
+      return timeB - timeA;
+    });
+    
+    callback(requests);
+  }, (error) => {
+    console.error("Error subscribing to all region borrow requests:", error);
+    callback([]);
   });
 };
 

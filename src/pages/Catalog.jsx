@@ -4,12 +4,16 @@ import { toast } from "react-toastify";
 import ItemCard from "../components/ItemCard";
 import SearchBar from "../components/SearchBar";
 import BorrowRequestModal from "../components/BorrowRequestModal";
-import { subscribeToItems } from "../services/itemService";
+import { subscribeToItemsByRegion } from "../services/itemService";
 import { createBorrowRequest } from "../services/borrowService";
+import RegionSelector from "../components/RegionSelector";
+import MapView from "../components/MapView";
 
 const Catalog = () => {
-  const { userId, user, isLoaded } = useAuth();
+  const { userId, user, regionId, isLoaded } = useAuth();
   const [items, setItems] = useState([]);
+  const [currentRegion, setCurrentRegion] = useState(regionId);
+  const [showMap, setShowMap] = useState(false);
   const [filteredItems, setFilteredItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -17,19 +21,21 @@ const Catalog = () => {
   const [showModal, setShowModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedMapLocation, setSelectedMapLocation] = useState(null);
   const itemsPerPage = 6;
 
-  // Load all items with real-time updates
+  // Load items for the selected region with real-time updates
   useEffect(() => {
-    const unsubscribe = subscribeToItems((fetchedItems) => {
+    setIsLoading(true);
+    const unsubscribe = subscribeToItemsByRegion(currentRegion, (fetchedItems) => {
       setItems(fetchedItems);
       setFilteredItems(fetchedItems);
       setIsLoading(false);
     });
 
-    // Cleanup subscription on unmount
+    // Cleanup subscription on unmount or region change
     return () => unsubscribe();
-  }, []);
+  }, [currentRegion]);
 
   useEffect(() => {
     let filtered = items.filter(
@@ -98,6 +104,17 @@ const Catalog = () => {
     setCurrentPage(page);
   };
 
+  const handleViewOnMap = (item) => {
+    if (item.coordinates && item.coordinates.lat && item.coordinates.lng) {
+      setSelectedMapLocation(item.coordinates);
+      setShowMap(true);
+      // Smooth scroll to the top where the map is located
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      toast.info("This item does not have location data available.");
+    }
+  };
+
   if (!isLoaded || isLoading) return <div className="loading">Loading...</div>;
 
   return (
@@ -107,12 +124,28 @@ const Catalog = () => {
         <p>Browse and borrow items from your community</p>
       </div>
 
-      <SearchBar
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
-      />
+      <div className="catalog-controls">
+        <div className="control-row">
+          <RegionSelector currentRegion={currentRegion} onRegionChange={setCurrentRegion} />
+          <button className="btn-secondary" onClick={() => setShowMap(!showMap)}>
+            {showMap ? "Hide Map" : "Show Map"}
+          </button>
+        </div>
+        <SearchBar
+          onSearch={setSearchTerm}
+          onCategoryChange={setSelectedCategory}
+        />
+      </div>
+
+      {showMap && (
+        <div className="map-section" style={{ margin: '1rem auto', padding: '1.5rem', maxWidth: '1000px', backgroundColor: 'var(--surface)', border: '1px solid var(--glass-border)', borderRadius: '12px' }}>
+          <div style={{ marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Nearby Community Items</h2>
+            <p style={{ color: 'var(--text-muted)' }}>Explore items available for borrowing in your local area. Discover what's nearby to make sharing easier. (Map pins show approximate locations based on owner settings).</p>
+          </div>
+          <MapView items={items} selectedLocation={selectedMapLocation} />
+        </div>
+      )}
 
       {filteredItems.length === 0 ? (
         <div className="empty-state">
@@ -129,6 +162,7 @@ const Catalog = () => {
                 owner={getOwner(item)}
                 onBorrow={handleBorrowClick}
                 isOwnItem={item.ownerId === userId}
+                onViewOnMap={handleViewOnMap}
               />
             ))}
           </div>

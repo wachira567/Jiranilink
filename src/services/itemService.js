@@ -18,6 +18,7 @@ import {
   deleteObject,
 } from "firebase/storage";
 import { db, storage } from "./firebase";
+import { uploadImageToCloudinary } from "./cloudinaryService";
 
 // Collection reference
 const itemsCollection = collection(db, "items");
@@ -29,17 +30,16 @@ export const addItem = async (itemData, imageFile) => {
   try {
     let imageUrl = "";
 
-    // Upload image if provided
+    // Upload image to Cloudinary if provided
     if (imageFile) {
-      const imageRef = ref(storage, `items/${Date.now()}_${imageFile.name}`);
-      const snapshot = await uploadBytes(imageRef, imageFile);
-      imageUrl = await getDownloadURL(snapshot.ref);
+      imageUrl = await uploadImageToCloudinary(imageFile);
     }
 
     // Add item to Firestore
     const docRef = await addDoc(itemsCollection, {
       ...itemData,
       imageUrl,
+      regionId: itemData.regionId || null, // Ensure regionId is saved
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -59,11 +59,9 @@ export const updateItem = async (itemId, updates, newImageFile = null) => {
     const itemRef = doc(db, "items", itemId);
     let updateData = { ...updates, updatedAt: serverTimestamp() };
 
-    // Upload new image if provided
+    // Upload new image to Cloudinary if provided
     if (newImageFile) {
-      const imageRef = ref(storage, `items/${Date.now()}_${newImageFile.name}`);
-      const snapshot = await uploadBytes(imageRef, newImageFile);
-      updateData.imageUrl = await getDownloadURL(snapshot.ref);
+      updateData.imageUrl = await uploadImageToCloudinary(newImageFile);
     }
 
     await updateDoc(itemRef, updateData);
@@ -79,15 +77,22 @@ export const updateItem = async (itemId, updates, newImageFile = null) => {
  */
 export const deleteItem = async (itemId, imageUrl) => {
   try {
-    // Delete image from storage if exists
-    if (imageUrl) {
-      const imageRef = ref(storage, imageUrl);
-      await deleteObject(imageRef).catch((err) => {
-        console.warn("Image deletion failed:", err);
-      });
-    }
+    // Note: Cloudinary unsigned images cannot be securely deleted from a client-side app
+    // without exposing the API secret. We skip image deletion here.
 
-    // Delete item from Firestore
+    // 1. Delete all borrow requests associated with this item
+    const requestsQuery = query(
+      collection(db, "borrowRequests"),
+      where("itemId", "==", itemId)
+    );
+    const querySnapshot = await getDocs(requestsQuery);
+    const deletePromises = [];
+    querySnapshot.forEach((docSnap) => {
+      deletePromises.push(deleteDoc(doc(db, "borrowRequests", docSnap.id)));
+    });
+    await Promise.all(deletePromises);
+
+    // 2. Delete item from Firestore
     await deleteDoc(doc(db, "items", itemId));
   } catch (error) {
     console.error("Error deleting item:", error);
@@ -120,14 +125,20 @@ export const getItemsByOwner = async (ownerId) => {
   try {
     const q = query(
       itemsCollection,
-      where("ownerId", "==", ownerId),
-      orderBy("createdAt", "desc")
+      where("ownerId", "==", ownerId)
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
+    const items = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
+    
+    // Sort descending by createdAt client-side
+    return items.sort((a, b) => {
+      const timeA = a.createdAt?.toMillis() || 0;
+      const timeB = b.createdAt?.toMillis() || 0;
+      return timeB - timeA;
+    });
   } catch (error) {
     console.error("Error getting items by owner:", error);
     throw error;
@@ -154,15 +165,49 @@ export const subscribeToItems = (callback) => {
 export const subscribeToItemsByOwner = (ownerId, callback) => {
   const q = query(
     itemsCollection,
-    where("ownerId", "==", ownerId),
-    orderBy("createdAt", "desc")
+    where("ownerId", "==", ownerId)
   );
   return onSnapshot(q, (snapshot) => {
     const items = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
+    items.sort((a, b) => {
+      const timeA = a.createdAt?.toMillis() || 0;
+      const timeB = b.createdAt?.toMillis() || 0;
+      return timeB - timeA;
+    });
     callback(items);
+  }, (error) => {
+    console.error("Error subscribing to items by owner:", error);
+    callback([]);
+  });
+};
+
+/**
+ * Subscribe to items by region (real-time)
+ */
+export const subscribeToItemsByRegion = (regionId, callback) => {
+  if (!regionId) return subscribeToItems(callback);
+
+  const q = query(
+    itemsCollection,
+    where("regionId", "==", regionId)
+  );
+  return onSnapshot(q, (snapshot) => {
+    const items = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    items.sort((a, b) => {
+      const timeA = a.createdAt?.toMillis() || 0;
+      const timeB = b.createdAt?.toMillis() || 0;
+      return timeB - timeA;
+    });
+    callback(items);
+  }, (error) => {
+    console.error("Error subscribing to items by region:", error);
+    callback([]);
   });
 };
 

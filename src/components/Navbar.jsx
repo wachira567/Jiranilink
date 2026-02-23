@@ -4,7 +4,7 @@ import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { useAuth } from "../hooks/useAuth";
 
 const Navbar = () => {
-  const { userName } = useAuth();
+  const { userName, user } = useAuth();
 
   return (
     <nav className="navbar">
@@ -32,6 +32,9 @@ const Navbar = () => {
             Profile
           </Link>
           <span className="welcome-text">Welcome, {userName}!</span>
+          {user?.publicMetadata?.role && ["admin", "super_admin"].includes(user.publicMetadata.role) && (
+            <Link to="/admin" className="nav-link">Admin</Link>
+          )}
           <UserButton afterSignOutUrl="/" />
         </SignedIn>
 
@@ -39,7 +42,7 @@ const Navbar = () => {
           <Link to="/sign-in" className="nav-link">
             Sign In
           </Link>
-          <Link to="/sign-up" className="nav-link btn-signup">
+          <Link to="/sign-up" className="nav-link">
             Sign Up
           </Link>
         </SignedOut>

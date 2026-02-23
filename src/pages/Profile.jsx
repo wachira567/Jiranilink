@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { subscribeToBorrowRequestsByBorrower } from "../services/borrowService";
+import { subscribeToItemsByOwner } from "../services/itemService";
 import { useAuth } from "../hooks/useAuth";
-import mockData from "../data/mockData.json";
 
 const Profile = () => {
   const { userId, userName, userEmail, userAvatar, isLoaded } = useAuth();
@@ -10,15 +11,23 @@ const Profile = () => {
   useEffect(() => {
     if (!userId) return;
 
-    // Get user's items - filter by Clerk userId
-    const items = mockData.items.filter((item) => item.ownerId === userId);
-    setUserItems(items);
+    // Subscribe to user's items in real-time
+    const unsubscribeItems = subscribeToItemsByOwner(userId, (items) => {
+      setUserItems(items);
+    });
 
-    // Get borrow history - filter by Clerk userId
-    const history = mockData.borrowRequests.filter(
-      (request) => request.borrowerId === userId
+    // Subscribe to borrow history in real-time
+    const unsubscribeHistory = subscribeToBorrowRequestsByBorrower(
+      userId,
+      (history) => {
+        setBorrowHistory(history);
+      }
     );
-    setBorrowHistory(history);
+
+    return () => {
+      unsubscribeItems();
+      unsubscribeHistory();
+    };
   }, [userId]);
 
   if (!isLoaded) return <div>Loading...</div>;
@@ -67,18 +76,17 @@ const Profile = () => {
       <div className="activity-section">
         <h2>Recent Activity</h2>
         <div className="activity-list">
-          {borrowHistory.map((request) => {
-            const item = mockData.items.find((i) => i.id === request.itemId);
-            return (
-              <div key={request.id} className="activity-item">
-                <p>
-                  You borrowed <strong>{item.name}</strong> from{" "}
-                  {request.startDate} to {request.endDate}
-                </p>
-                <p className="status">Status: {request.status}</p>
-              </div>
-            );
-          })}
+          {borrowHistory.map((request) => (
+            <div key={request.id} className="activity-item glass">
+              <p>
+                You borrowed <strong>{request.itemName}</strong> from{" "}
+                {request.startDate} to {request.endDate}
+              </p>
+              <p className={`status-badge status-${request.status}`}>
+                {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+              </p>
+            </div>
+          ))}
           {borrowHistory.length === 0 && <p>No recent activity.</p>}
         </div>
       </div>

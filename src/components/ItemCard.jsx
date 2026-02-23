@@ -1,16 +1,24 @@
 import React, { useState } from "react";
 import ChatButton from "./ChatButton";
 
-const ItemCard = ({ item, owner, onBorrow, isOwnItem = false }) => {
+const ItemCard = ({ item, owner, onBorrow, isOwnItem = false, onViewOnMap }) => {
   const [showDetails, setShowDetails] = useState(false);
 
   return (
     <div className="item-card catalog-item-card">
-      <div className="item-image-container">
+      <div className="item-image-container" style={{
+        height: '180px',
+        backgroundColor: 'var(--glass)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '20px 20px 0 0',
+        overflow: 'hidden'
+      }}>
         {item.imageUrl ? (
-          <img src={item.imageUrl} alt={item.name} className="item-image" />
+          <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <div className="item-icon-placeholder">{item.image || "📦"}</div>
+          <div className="item-icon-placeholder" style={{ fontSize: '5rem' }}>{item.image || "📦"}</div>
         )}
         {!item.availability && (
           <div className="unavailable-overlay">Unavailable</div>
@@ -50,6 +58,15 @@ const ItemCard = ({ item, owner, onBorrow, isOwnItem = false }) => {
           >
             {showDetails ? "Less" : "More"} Details
           </button>
+          
+          <button
+            className="btn-secondary"
+            onClick={() => onViewOnMap && onViewOnMap(item)}
+            title={item.coordinates ? "View on Map" : "No location available"}
+          >
+            📍 Map
+          </button>
+
           {!isOwnItem && (
             <>
               <ChatButton

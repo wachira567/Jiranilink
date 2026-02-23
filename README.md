@@ -1,23 +1,33 @@
-# JiraniLink
+# JiraniLink: Empowering Communities Through Sharing
 
-JiraniLink is a community-driven platform that connects neighbors to borrow and share items, fostering trust and collaboration within local communities. Built with React, this application allows users to browse available items, make borrow requests, and build a network of trusted neighbors.
+JiraniLink is a modern, community-driven platform designed to connect neighbors, reduce waste, and build trust through the sharing of tools, equipment, and everyday items. Built with modern web technologies, this application allows users to browse available items within their specific region, make secure borrow requests, and communicate seamlessly with trusted neighbors.
 
-## Features
+## Societal Impact: Building a Better World, Locally
 
-- **Item Catalog**: Browse a comprehensive list of items available for borrowing from neighbors
-- **Search & Filter**: Find items by name, description, or category
-- **Borrow Requests**: Submit borrow requests with dates and manage approvals
-- **User Profiles**: View neighbor profiles with ratings and reviews
-- **Responsive Design**: Optimized for desktop and mobile devices
-- **Pagination**: Efficient browsing through large item catalogs
+In today's fast-paced world, people often buy expensive items (like power tools, ladders, or camping gear) that they only use once, while their next-door neighbor might have the exact same item sitting idle. JiraniLink makes society better by:
+- **Promoting Sustainability**: Reducing overconsumption and minimizing environmental waste by maximizing the utility of existing products.
+- **Fostering Community Trust**: Encouraging real-world interactions and building stronger, more resilient neighborhood bonds.
+- **Economic Empowerment**: Saving households money by eliminating the need to purchase rarely used items.
+- **Micro-Local Governance**: Empowering community leaders to moderate their specific region, ensuring a safe and reliable sharing environment.
+
+## Key Features
+
+- **Regional Isolation**: Items and requests are filtered by community region, ensuring you only interact with people nearby.
+- **Interactive Community Map**: Discover what's available around you with a built-in map featuring privacy-preserving geolocation pins.
+- **Real-Time Private Chat**: Secure 1-on-1 messaging between borrowers and lenders.
+- **Admin Governance Dashboard**: A dedicated control center for regional leaders to monitor transactions, manage inventory, and enforce guidelines.
+- **Rich Item Catalog & Search**: Find exactly what you need with category filtering and keyword search.
+- **Custom Image Uploads**: Securely upload photos of your items or use built-in fallbacks.
+- **Premium Glassmorphism UI**: A beautiful, responsive, modern dark-themed interface.
 
 ## Tech Stack
 
-- **Frontend**: React 19
-- **Build Tool**: Vite
-- **Routing**: React Router DOM
-- **Linting**: ESLint
-- **Styling**: CSS Modules
+- **Frontend**: React 19, Vite, React Router DOM
+- **Authentication**: Clerk
+- **Database & Real-time Sync**: Firebase Firestore
+- **Image Storage**: Cloudinary (Custom Uploads) & Firebase Storage
+- **Mapping**: Mapbox GL JS (with Geolocation API)
+- **Styling**: Vanilla CSS (Glassmorphism architecture)
 
 ## Installation
 
@@ -48,6 +58,23 @@ npm run dev
 - **Catalog**: Browse and search for available items
 - **My Items**: Manage your own items (future feature)
 - **Profile**: View and edit your profile information
+
+## Admin Configuration
+
+JiraniLink uses Clerk's **Public Metadata** to assign administrative roles. To grant a user access to the Admin Dashboard:
+
+1. Go to your [Clerk Dashboard](https://dashboard.clerk.com/) and select your application.
+2. In the left sidebar, click on **Users**.
+3. Select the user you wish to authorize.
+4. Scroll down to the **Public Metadata** section and click **Edit**.
+5. Add the following JSON structure:
+   ```json
+   {
+     "role": "admin"
+   }
+   ```
+   *(To create a Global Admin, use `"super_admin"` instead of `"admin"`)*
+6. Click **Save**. The user will see the "Admin" link in their navigation bar upon their next login.
 
 ## Project Structure
 

@@ -52,15 +52,21 @@ const MyItems = () => {
     try {
       const userName = user?.fullName || user?.firstName || "User";
 
-      // Prepare item data for Firebase
+      // Extract imageFile if it exists, otherwise pass null
+      const imageFile = itemData.imageFile || null;
+      
+      // Remove imageFile from the object going to Firestore since it can't be serialized
+      const { imageFile: _, ...dataForFirestore } = itemData;
+
       const itemToAdd = {
-        ...itemData,
+        ...dataForFirestore,
         ownerId: userId,
         ownerName: userName,
+        regionId: user?.publicMetadata?.regionId || null,
       };
 
-      // Add item to Firebase (no image file, using emoji)
-      await addItem(itemToAdd, null);
+      // Add item to Firebase (with optional image file)
+      await addItem(itemToAdd, imageFile);
       toast.success("Item added successfully!");
     } catch (error) {
       console.error("Error adding item:", error);
@@ -145,8 +151,24 @@ const MyItems = () => {
           <div className="items-grid">
             {myItems.map((item) => (
               <div key={item.id} className="item-card my-item-card">
-                <div className="item-icon-placeholder">
-                  <span style={{ fontSize: "4rem" }}>{item.image}</span>
+                <div className="item-icon-placeholder" style={{ 
+                  height: '150px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  background: 'var(--glass)',
+                  borderRadius: '12px 12px 0 0',
+                  overflow: 'hidden'
+                }}>
+                  {item.imageUrl ? (
+                    <img 
+                      src={item.imageUrl} 
+                      alt={item.name} 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    />
+                  ) : (
+                    <span style={{ fontSize: "4rem" }}>{item.image}</span>
+                  )}
                 </div>
 
                 <div className="item-content">

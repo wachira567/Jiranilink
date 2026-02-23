@@ -15,5 +15,7 @@ export const useAuth = () => {
     userEmail: user?.primaryEmailAddress?.emailAddress || null,
     userName: user?.fullName || user?.firstName || "User",
     userAvatar: user?.imageUrl || null,
+    regionId: user?.publicMetadata?.regionId || null,
+    role: user?.publicMetadata?.role || "user", // "user", "admin", "super_admin"
   };
 };

@@ -150,8 +150,7 @@ export const subscribeToUserChatRooms = (userId, callback) => {
   const chatRoomsRef = collection(db, "chatRooms");
   const q = query(
     chatRoomsRef,
-    where("participants", "array-contains", userId),
-    orderBy("lastMessageTime", "desc")
+    where("participants", "array-contains", userId)
   );
 
   return onSnapshot(q, (snapshot) => {
@@ -162,7 +161,18 @@ export const subscribeToUserChatRooms = (userId, callback) => {
         ...doc.data(),
       });
     });
+    
+    // Sort client-side to avoid needing a Firestore composite index
+    chatRooms.sort((a, b) => {
+      const timeA = a.lastMessageTime?.toMillis() || 0;
+      const timeB = b.lastMessageTime?.toMillis() || 0;
+      return timeB - timeA; // desc
+    });
+    
     callback(chatRooms);
+  }, (error) => {
+    console.error("Error subscribing to chat rooms:", error);
+    callback([]);
   });
 };
 
@@ -172,9 +182,9 @@ export const subscribeToUserChatRooms = (userId, callback) => {
 export const markMessagesAsRead = async (chatRoomId, userId) => {
   try {
     const messagesRef = collection(db, "chatRooms", chatRoomId, "messages");
+    // Avoid composite index by querying only one field and filtering the other client-side
     const q = query(
       messagesRef,
-      where("senderId", "!=", userId),
       where("read", "==", false)
     );
 
@@ -182,14 +192,16 @@ export const markMessagesAsRead = async (chatRoomId, userId) => {
 
     const updatePromises = [];
     snapshot.forEach((document) => {
-      const messageRef = doc(
-        db,
-        "chatRooms",
-        chatRoomId,
-        "messages",
-        document.id
-      );
-      updatePromises.push(updateDoc(messageRef, { read: true }));
+      if (document.data().senderId !== userId) {
+        const messageRef = doc(
+          db,
+          "chatRooms",
+          chatRoomId,
+          "messages",
+          document.id
+        );
+        updatePromises.push(updateDoc(messageRef, { read: true }));
+      }
     });
 
     await Promise.all(updatePromises);
@@ -198,20 +210,23 @@ export const markMessagesAsRead = async (chatRoomId, userId) => {
   }
 };
 
-/**
- * Get unread message count for a chat room
- */
 export const getUnreadCount = async (chatRoomId, userId) => {
   try {
     const messagesRef = collection(db, "chatRooms", chatRoomId, "messages");
+    // Avoid composite index by querying only one field and filtering the other client-side
     const q = query(
       messagesRef,
-      where("senderId", "!=", userId),
       where("read", "==", false)
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.size;
+    let count = 0;
+    snapshot.forEach((doc) => {
+      if (doc.data().senderId !== userId) {
+        count++;
+      }
+    });
+    return count;
   } catch (error) {
     console.error("Error getting unread count:", error);
     return 0;

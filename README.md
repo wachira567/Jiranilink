@@ -1,5 +1,7 @@
 # JiraniLink: Empowering Communities Through Sharing
 
+# Liveurl: https://jiranilink.vercel.app/
+
 JiraniLink is a modern, community-driven platform designed to connect neighbors, reduce waste, and build trust through the sharing of tools, equipment, and everyday items. Built with modern web technologies, this application allows users to browse available items within their specific region, make secure borrow requests, and communicate seamlessly with trusted neighbors.
 
 ## Societal Impact: Building a Better World, Locally
